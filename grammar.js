@@ -24,11 +24,12 @@ function section(rule) {
     );
 }
 
-{
+module.exports = grammar({
+    name: 'nim',
     rules: {
         // WARNING
         // module = stmt ^* (';' / IND{=})
-        module: $ => sepList($.stmt, choice(';', $.indent)),
+        module: $ => sepList($.stmt, choice(';', $.IND_EQ)),
 
         // comma = ',' COMMENT?
         comma: $ => seq(',', comm()),
@@ -315,7 +316,7 @@ function section(rule) {
         //     | &( '`'|IDENT|literal|'cast'|'addr'|'type') expr # command syntax
 
         primarySuffix: $ => choice(
-            seq('(', repeat(seq($.exprColonEqExpr, optional($.comma))) ')'),
+            seq('(', repeat(seq($.exprColonEqExpr, optional($.comma))), ')'),
             seq('.', $.optInd, $.symbol, $.optional($.generalizedLit)),
             seq('[', $.optInd, $.exprColonEqExprList, $.optPar, ']'),
             seq('{', $.optInd, $.exprColonEqExprList, $.optPar, '}'),
@@ -354,7 +355,7 @@ function section(rule) {
 
         // identColonEquals = IDENT (comma IDENT)* comma?
         //   (':' optInd typeDesc)? ('=' optInd expr)?)
-        identColonEquals = seq(
+        identColonEquals: $ => seq(
             $.IDENT,
             repeat(seq($.comma, $.IDENT)),
             optional($.comma),
@@ -591,7 +592,7 @@ function section(rule) {
         condStmt: $ => seq(
             seq($.expr, $.colcom, $.stmt, optional($.COMMENT)),
             repeat(seq($.IND_EQ, 'elif', $.expr, $.colcom, $.stmt)),
-            optional(seq($.IND_EQ 'else', $.colcom, $.stmt))
+            optional(seq($.IND_EQ, 'else', $.colcom, $.stmt))
         ),
 
         // ifStmt = 'if' condStmt
@@ -657,10 +658,10 @@ function section(rule) {
         //            (optInd 'except' exprList colcom stmt)*
         //            (optInd 'finally' colcom stmt)?
         tryExpr: $ => seq(
-            'try' colcom stmt &(optInd 'except'|'finally'),
+            'try', $.colcom, $.stmt, seq($.optInd, choice('except', 'finally')),
             repeat(seq($.optInd, 'except', $.exprList, $.colcom, $.stmt)),
-            repeat(seq($.optInd, 'finally', $.colcom, $.stmt))?
-        )
+            optional(seq($.optInd, 'finally', $.colcom, $.stmt))
+        ),
 
         // exceptBlock = 'except' colcom stmt
         exceptBlock: $ => seq('except', $.colcom, $.stmt),
@@ -678,7 +679,7 @@ function section(rule) {
         deferStmt: $ => seq('defer', $.colcom, $.stmt),
 
         // asmStmt = 'asm' pragma? (STR_LIT | RSTR_LIT | TRIPLESTR_LIT)
-        asmStmt = seq(
+        asmStmt: $ => seq(
             'asm',
             optional($pragma),
             choice($.STR_LIT, $.RSTR_LIT, $.TRIPLESTR_LIT)
@@ -766,7 +767,7 @@ function section(rule) {
         // objectCase = 'case' identWithPragma ':' typeDesc ':'? COMMENT?
         //             (IND{>} objectBranches DED
         //             | IND{=} objectBranches)
-        objectCase = seq(
+        objectCase: $ => seq(
             'case', $.identWithPragma, ':', $.typeDesc. optional(':'), comm(),
             choice(
                 seq($.IND_GE, $.objectBranches, $.DED),
@@ -872,7 +873,7 @@ function section(rule) {
         // simpleStmt = ((returnStmt | raiseStmt | yieldStmt | discardStmt | breakStmt
         //            | continueStmt | pragmaStmt | importStmt | exportStmt | fromStmt
         //            | includeStmt | commentStmt) / exprStmt) COMMENT?
-        simpleStmt = seq(
+        simpleStmt: $ => seq(
             choice(
                 choice(
                     $.returnStmt,
@@ -908,7 +909,7 @@ function section(rule) {
         //                     | ('let' | 'var' | 'using') section(variable)
         //                     | bindStmt | mixinStmt)
         //                     / simpleStmt
-        complexOrSimpleStmt = choice(
+        complexOrSimpleStmt: $ => choice(
             choice(
                 $.ifStmt,
                 $.whenStmt,
@@ -944,6 +945,85 @@ function section(rule) {
             sepList1($.simpleStmt, ';')
         ),
 
-    }
+        // // hexdigit = digit | 'A'..'F' | 'a'..'f'
+        // hexdigit: $ => /[0-9A-Fa-f]/,
 
-}
+        // // octdigit = '0'..'7'
+        // octdigit: $ => /[0-7]/,
+
+        // // bindigit = '0'..'1'
+        // bindigit: $ => '0'..'1',
+
+        // HEX_LIT = '0' ('x' | 'X' ) hexdigit ( ['_'] hexdigit )*
+        HEX_LIT: $ => /0(x|X)[0-9A-Fa-f]([_0-9A-Fa-f])*/,
+
+        // DEC_LIT = digit ( ['_'] digit )*
+        DEC_LIT: $ => /[0-9]([_0-9])*/,
+
+        // OCT_LIT = '0' 'o' octdigit ( ['_'] octdigit )*
+        OCT_LIT: $ => /0o[0-7]([_0-7])*/,
+
+        // BIN_LIT = '0' ('b' | 'B' ) bindigit ( ['_'] bindigit )*
+        BIN_LIT: $ => /0b[01]([_01])*/,
+
+        // INT_LIT = HEX_LIT
+        //         | DEC_LIT
+        //         | OCT_LIT
+        //         | BIN_LIT
+        INT_LIT: $ => seq($.HEX_LIT, $.DEC_LIT, $.OCT_LIT, $.BIN_LIT),
+
+        // INT8_LIT = INT_LIT ['\''] ('i' | 'I') '8'
+        INT8_LIT: $ => seq($.INT_LIT, /\'(i|I)8/),
+
+        // INT16_LIT = INT_LIT ['\''] ('i' | 'I') '16'
+        INT16_LIT: $ => seq($.INT_LIT, /\'(i|I)16/),
+
+        // INT32_LIT = INT_LIT ['\''] ('i' | 'I') '32'
+        INT32_LIT: $ => seq($.INT_LIT, /\'(i|I)32/),
+
+        // INT64_LIT = INT_LIT ['\''] ('i' | 'I') '64'
+        INT64_LIT: $ => seq($.INT_LIT, /\'(i|I)64/),
+
+        // UINT_LIT = INT_LIT ['\''] ('u' | 'U')
+        UINT_LIT: $ => seq($.INT_LIT, /\'u/),
+
+        // UINT8_LIT = INT_LIT ['\''] ('u' | 'U') '8'
+        UINT8_LIT: $ => seq($.INT_LIT, /\'(u|U)8/),
+
+        // UINT16_LIT = INT_LIT ['\''] ('u' | 'U') '16'
+        UINT16_LIT: $ => seq($.INT_LIT, /\'(u|U)16/),
+
+        // UINT32_LIT = INT_LIT ['\''] ('u' | 'U') '32'
+        UINT32: $ => seq($.INT_LIT, /\'(u|U)32/),
+
+        // UINT64_LIT = INT_LIT ['\''] ('u' | 'U') '64'
+        UINT64_LIT: $ => seq($.INT_LIT, /\'(u|U)64/),
+
+        // exponent = ('e' | 'E' ) ['+' | '-'] digit ( ['_'] digit )*
+        exponent: $ => /[eE][+-][0-9][_0-9]*/,
+
+        // FLOAT_LIT = digit (['_'] digit)* (('.' digit (['_'] digit)* [exponent]) |exponent)
+        FLOAT_LIT: $ => /[0-9][_0-9]*(\.[0-9][_0-9]*[eE][+-][0-9][_0-9]*)|([eE][+-][0-9][_0-9]*)/,
+
+        // FLOAT32_SUFFIX = ('f' | 'F') ['32']
+        FLOAT32_SUFFIX: $ => /[fF]32/,
+
+        // FLOAT32_LIT = HEX_LIT '\'' FLOAT32_SUFFIX
+        //             | (FLOAT_LIT | DEC_LIT | OCT_LIT | BIN_LIT) ['\''] FLOAT32_SUFFIX
+        FLOAT32_LIT: $ => choice(
+            seq($.HEX_LIT, '\'', $.FLOAT32_SUFFIX),
+            seq(choice($.FLOAT_LIT, $.DEC_LIT, $.OCT_LIT, $.BIN_LIT), '\'', $.FLOAT32_SUFFIX)
+        ),
+
+        // FLOAT64_SUFFIX = ( ('f' | 'F') '64' ) | 'd' | 'D'
+        FLOAT64_SUFFIX: $ => /([fF]64|d|D)/,
+
+        // FLOAT64_LIT = HEX_LIT '\'' FLOAT64_SUFFIX
+        //             | (FLOAT_LIT | DEC_LIT | OCT_LIT | BIN_LIT) ['\''] FLOAT64_SUFFIX
+        FLOAT64_LIT: $ => choice(
+            seq($.HEX_LIT, '\'', $.FLOAT64_SUFFIX),
+            seq(choice($.FLOAT_LIT, $.DEC_LIT, $.OCT_LIT, $.BIN_LIT), '\'', $.FLOAT64_SUFFIX)
+        ),
+
+    }
+});
