@@ -16,29 +16,39 @@ enum TokenType
     GENERALIZED_TRIPLESTR_LIT
 };
 
-void* tree_sitter_nim_external_scanner_create() {}
+void* tree_sitter_nim_external_scanner_create() {
+    return NULL;
+}
 
-void tree_sitter_nim_external_scanner_destroy(void* payload) {}
+void tree_sitter_nim_external_scanner_destroy(void* payload) {
+}
 
 unsigned tree_sitter_nim_external_scanner_serialize(
     void* payload,
-    char* buffer) {}
+    char* buffer) {
+    return 0;
+}
 
 void tree_sitter_nim_external_scanner_deserialize(
     void*       payload,
     const char* buffer,
-    unsigned    length) {}
+    unsigned    length) {
+}
+
+#define AT(charVal) (lexer->lookahead == (charVal))
+#define SKIP() (lexer->advance(lexer, false);)
+#define NEXT() (lexer->advance(lexer, true);)
 
 bool tree_sitter_nim_external_scanner_scan(
     void*       payload,
     TSLexer*    lexer,
     const bool* valid_symbols) {
 
-    printf("Requested scan at char %c\n", lexer->lookahead);
-    for (int i = 0; i < GENERALIZED_TRIPLESTR_LIT; ++i) {
-        printf(
-            "Expecting [%d]: [%s]\n",
-            i,
-            valid_symbols[i] ? "true" : "false");
-    }
+
+    /* printf("Requested scan at char '%c'\n", lexer->lookahead); */
+    /* if (valid_symbols[STR_LIT] && AT('"')) { */
+    /*     puts("Scanning over string"); */
+    /* } */
+
+    return false;
 }
