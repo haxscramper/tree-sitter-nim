@@ -10,8 +10,32 @@ function comm($) {
     return optional($.COMMENT);
 }
 
-function oind($) {
-    return optional($.IND);
+function optInd($) {
+    return seq($.COMMENT, optional($.IND));
+}
+
+function optPar($) {
+    return optional(choice($.IND_GE, $.IND_EQ));
+}
+
+function paramListColon($) {
+    // paramListColon = paramList? (':' optInd typeDesc)?
+    return seq(
+        optional($.paramList),
+        optional(seq(':', optInd($), $.typeDesc))
+    );
+}
+// paramListArrow = paramList? ('->' optInd typeDesc)?
+function paramListArrow($) {
+    return seq(
+      optional($.paramList),
+      optional(seq('->', optInd($), $.typeDesc))
+    );
+}
+
+// indAndComment = (IND{>} COMMENT)? | COMMENT?
+function indAndComment($) {
+    return choice(optional(seq($.IND_GE, $.COMMENT)), comm($));
 }
 
 function section($, rule) {
@@ -49,7 +73,7 @@ module.exports = grammar({
         module: $ => sepList($.stmt, choice(';', $.IND_EQ)),
 
         // comma = ',' COMMENT?
-        comma: $ => seq(',', comm($)),
+        comma: $ => prec.left(seq(',', comm($))),
 
         // semicolon = ';' COMMENT?
         semicolon: $ => seq(';', comm($)),
@@ -58,9 +82,9 @@ module.exports = grammar({
         colon: $ => seq(':', comm($)),
 
         // colcom = ':' COMMENT?
-        colcom: $ => seq(':', comm($)),
+        colcom: $ => prec.left(1, seq(':', comm($))),
 
-        KEYW: $ => choice(
+        KEYW: $ => prec(2, choice(
             'addr', 'and', 'as', 'asm', 'bind', 'block', 'break', 'case',
             'cast', 'concept', 'const', 'continue', 'converter', 'defer',
             'discard', 'distinct', 'div', 'do', 'elif', 'else', 'end',
@@ -71,7 +95,7 @@ module.exports = grammar({
             'raise', 'ref', 'return', 'shl', 'shr', 'static', 'template',
             'try', 'tuple', 'type', 'using', 'var', 'when', 'while', 'xor',
             'yield',
-        ),
+        )),
 
         IDENT: $ => /[A-Za-z\x80-\xFF]([_A-Za-z0-9\x80-\xFF])*/,
 
@@ -109,7 +133,7 @@ module.exports = grammar({
             // '..'
         ),
 
-        OPR: $ => $.operator,
+        OPR: $ => /[=+\-*\/<>@$~&%|!?^.:\\]/,
 
         OP10: $ => /[$^][=+\-*\/<>@$~&%|!?^.:\\]*/,
         OP9: $ => choice(
@@ -144,67 +168,67 @@ module.exports = grammar({
         // prefixOperator = operator
         prefixOperator: $ => $.operator,
 
-        // optInd = COMMENT? IND?
-        optInd: $ => seq(comm($), optional($.IND)),
+        // // optInd = COMMENT? IND?
+        // optInd: $ => seq(comm($), oind($)),
 
-        // optPar = (IND{>} | IND{=})?
-        optPar: $ => optional(choice($.IND_GE, $.IND_EQ)),
+        // // optPar = (IND{>} | IND{=})?
+        // optPar: $ => optional(choice($.IND_GE, $.IND_EQ)),
 
         // simpleExpr = arrowExpr (OP0 optInd arrowExpr)* pragma?
-        simpleExpr: $ => seq(
+        simpleExpr: $ => prec.left(seq(
             $.arrowExpr,
-            repeat(seq($.OP0, $.optInd, $.arrowExpr)),
+            repeat(seq($.OP0, optInd($), $.arrowExpr)),
             optional($.pragma)
-        ),
+        )),
 
         // arrowExpr = assignExpr (OP1 optInd assignExpr)*
-        arrowExpr: $ => seq(
+        arrowExpr: $ => prec.left(seq(
             $.assignExpr,
-            repeat(seq($.OP1, $.optInd, $.assignExpr))),
+            repeat(seq($.OP1, optInd($), $.assignExpr)))),
 
         // assignExpr = orExpr (OP2 optInd orExpr)*
-        assignExpr: $ => seq(
+        assignExpr: $ => prec.left(seq(
             $.orExpr,
-            repeat(seq($.OP2, $.optInd, $.orExpr))),
+            repeat(seq($.OP2, optInd($), $.orExpr)))),
 
         // orExpr = andExpr (OP3 optInd andExpr)*
-        orExpr: $ => seq(
+        orExpr: $ => prec.left(seq(
             $.andExpr,
-            repeat(seq($.OP3, $.optInd, $.andExpr))),
+            repeat(seq($.OP3, optInd($), $.andExpr)))),
 
         // andExpr = cmpExpr (OP4 optInd cmpExpr)*
-        andExpr: $ => seq(
+        andExpr: $ => prec.left(seq(
             $.cmpExpr,
-            repeat(seq($.OP4, $.optInd, $.cmpExpr))),
+            repeat(seq($.OP4, optInd($), $.cmpExpr)))),
 
         // cmpExpr = sliceExpr (OP5 optInd sliceExpr)*
-        cmpExpr: $ => seq(
+        cmpExpr: $ => prec.left(seq(
             $.sliceExpr,
-            repeat(seq($.OP5, $.optInd, $.sliceExpr))),
+            repeat(seq($.OP5, optInd($), $.sliceExpr)))),
 
         // sliceExpr = ampExpr (OP6 optInd ampExpr)*
-        sliceExpr: $ => seq(
+        sliceExpr: $ => prec.left(seq(
             $.ampExpr,
-            repeat(seq($.OP6, $.optInd, $.ampExpr))),
+            repeat(seq($.OP6, optInd($), $.ampExpr)))),
 
 
         // ampExpr = plusExpr (OP7 optInd plusExpr)*
-        ampExpr: $ => seq(
+        ampExpr: $ => prec.left(seq(
             $.plusExpr,
-            repeat(seq($.OP7, $.optInd, $.plusExpr))),
+            repeat(seq($.OP7, optInd($), $.plusExpr)))),
 
         // plusExpr = mulExpr (OP8 optInd mulExpr)*
-        plusExpr: $ => seq(
+        plusExpr: $ => prec.left(seq(
             $.mulExpr,
-            repeat(seq($.OP8, $.optInd, $.mulExpr))),
+            repeat(seq($.OP8, optInd($), $.mulExpr)))),
 
         // mulExpr = dollarExpr (OP9 optInd dollarExpr)*
-        mulExpr: $ => seq(
+        mulExpr: $ => prec.left(seq(
             $.dollarExpr,
-            repeat(seq($.OP9, $.optInd, $.dollarExpr))),
+            repeat(seq($.OP9, optInd($), $.dollarExpr)))),
 
         // dollarExpr = primary (OP10 optInd primary)*
-        dollarExpr: $ => seq($.primary, repeat(seq($.OP10, $.optInd, $.primary))),
+        dollarExpr: $ => seq($.primary, repeat(seq($.OP10, optInd($), $.primary))),
 
         // symbol = '`' (KEYW|IDENT|literal|(operator|'('|')'|'['|']'|'{'|'}'|'=')+)+ '`'
         // | IDENT | KEYW
@@ -236,7 +260,7 @@ module.exports = grammar({
         dotExpr: $ => seq(
             $.expr,
             '.',
-            $.optInd,
+            optInd($),
             choice($.symbol, seq('[:', $.exprList, ']'))),
 
         // explicitGenericInstantiation = '[:' exprList ']' ( '(' exprColonEqExpr ')' )?
@@ -250,7 +274,7 @@ module.exports = grammar({
 
         qualifiedIdent: $ => seq(
             $.symbol,
-            optional(seq('.', $.optInd, $.symbol))),
+            optional(seq('.', optInd($), $.symbol))),
 
         // setOrTableConstr = '{' ((exprColonEqExpr comma)* | ':' ) '}'
         setOrTableConstr: $ => seq(
@@ -262,8 +286,8 @@ module.exports = grammar({
         // castExpr = 'cast' ('[' optInd typeDesc optPar ']' '(' optInd expr optPar ')')
         castExpr: $ => seq(
             'cast',
-            seq('[', $.optInd, $.typeDesc, $.optPar, ']',
-                '(', $.optInd, $.expr, $.optPar, ')')),
+            seq('[', optInd($), $.typeDesc, optPar($), ']',
+                '(', optInd($), $.expr, optPar($), ')')),
 
         // parKeyw = 'discard' | 'include' | 'if' | 'while' | 'case' | 'try'
         // | 'finally' | 'except' | 'for' | 'block' | 'const' | 'let'
@@ -295,7 +319,7 @@ module.exports = grammar({
         // optPar ')'
         par: $ => seq(
             '(',
-            $.optInd,
+            optInd($),
             choice(
                 seq(
                     $.parKeyw,
@@ -311,7 +335,7 @@ module.exports = grammar({
 
                     seq(':', $.expr, optional(seq(
                         ',', sepList1($.exprColonEqExpr, ',')))))),
-            $.optPar,
+            optPar($),
             ')'
         ),
 
@@ -360,20 +384,20 @@ module.exports = grammar({
         // tupleConstr = '(' optInd (exprColonEqExpr comma?)* optPar ')'
         tupleConstr: $ => seq(
             '(',
-            $.optInd,
+            optInd($),
             repeat(seq($.exprColonEqExpr, optional($.comma))),
-            $.optPar,
+            optPar($),
             ')'
         ),
 
         // arrayConstr = '[' optInd (exprColonEqExpr comma?)* optPar ']'
-        arrayConstr: $ => seq(
+        arrayConstr: $ => prec(2, seq(
             '[',
-            $.optInd,
+            optInd($),
             repeat(seq($.exprColonEqExpr, optional($.comma))),
-            $.optPar,
+            optPar($),
             ']'
-        ),
+        )),
 
         // primarySuffix = '(' (exprColonEqExpr comma?)* ')'
         //     | '.' optInd symbol generalizedLit?
@@ -383,25 +407,25 @@ module.exports = grammar({
 
         primarySuffix: $ => choice(
             seq('(', repeat(seq($.exprColonEqExpr, optional($.comma))), ')'),
-            seq('.', $.optInd, $.symbol, optional($.generalizedLit)),
-            seq('[', $.optInd, $.exprColonEqExprList, $.optPar, ']'),
-            seq('{', $.optInd, $.exprColonEqExprList, $.optPar, '}'),
+            seq('.', optInd($), $.symbol, optional($.generalizedLit)),
+            seq('[', optInd($), $.exprColonEqExprList, optPar($), ']'),
+            seq('{', optInd($), $.exprColonEqExprList, optPar($), '}'),
             seq(choice('`', $.IDENT, $.literal, 'cast', 'addr', 'type'), $.expr)
         ),
 
-        pragma: $ => seq(
+        pragma: $ => prec(2, seq(
             '{.',
-            $.optInd,
+            optInd($),
             repeat(seq($.exprColonEqExpr, optional($.comma))),
-            $.optPar,
+            optPar($),
             choice('.}', '}')
-        ),
+        )),
 
         // identVis = symbol OPR?  # postfix position
         identVis: $ => seq($.symbol, optional($.OPR)),
 
         // identVisDot = symbol '.' optInd symbol OPR?
-        identVisDot: $ => seq($.symbol, '.', $.optInd, $.symbol, optional($.OPR)),
+        identVisDot: $ => seq($.symbol, '.', optInd($), $.symbol, optional($.OPR)),
 
         // identWithPragma = identVis pragma?
         identWithPragma: $ => seq($.identVis, optional($.pragma)),
@@ -411,32 +435,32 @@ module.exports = grammar({
 
         // declColonEquals = identWithPragma (comma identWithPragma)* comma?
         //   (':' optInd typeDesc)? ('=' optInd expr)?
-        declColonEquals: $ => seq(
+        declColonEquals: $ => prec.left(seq(
             $.identWithPragma,
             repeat(seq($.comma, $.identWithPragma)),
             optional($.comma),
-            optional(seq(':', $.optInd, $.typeDesc)),
-            optional(seq('=', $.optInd, $.expr))
-        ),
+            optional(seq(':', optInd($), $.typeDesc)),
+            optional(seq('=', optInd($), $.expr))
+        )),
 
         // identColonEquals = IDENT (comma IDENT)* comma?
         //   (':' optInd typeDesc)? ('=' optInd expr)?)
-        identColonEquals: $ => seq(
+        identColonEquals: $ => prec.left(2, seq(
             $.IDENT,
             repeat(seq($.comma, $.IDENT)),
             optional($.comma),
-            optional(seq(':', $.optInd, $.typeDesc)),
-            optional(seq('=', $.optInd, $.expr))
-        ),
+            optional(seq(':', optInd($), $.typeDesc)),
+            optional(seq('=', optInd($), $.expr))
+        )),
 
         // inlTupleDecl = 'tuple'
         //   '[' optInd  (identColonEquals (comma/semicolon)?)*  optPar ']'
         inlTupleDecl: $ => seq(
             'tuple',
             '[',
-            $.optInd,
+            optInd($),
             repeat(seq($.identColonEquals, choice($.comma, $.semicolon))),
-            $.optPar,
+            optPar($),
             ']'
         ),
 
@@ -459,39 +483,27 @@ module.exports = grammar({
         paramList: $ => seq('(', sepList(
             $.declColonEquals, choice($.comma, $.semicolon)), ')'),
 
-        // paramListArrow = paramList? ('->' optInd typeDesc)?
-        paramListArrow: $ => seq(
-            optional($.paramList),
-            optional(seq('->', $.optInd, $.typeDesc))
-        ),
-
-        // paramListColon = paramList? (':' optInd typeDesc)?
-        paramListColon: $ => seq(
-            optional($.paramList),
-            optional(seq(':', $.optInd, $.typeDesc))
-        ),
-
         // doBlock = 'do' paramListArrow pragma? colcom stmt
         doBlock: $ => seq(
-            'do', $.paramListArrow, optional($.pragma), $.colcom,
+            'do', paramListArrow($), optional($.pragma), $.colcom,
             $.stmt
         ),
 
         // procExpr = 'proc' paramListColon pragma? ('=' COMMENT? stmt)?
         procExpr: $ => seq(
             'proc',
-            $.paramListColon,
+            paramListColon($),
             optional($.pragma),
             optional(seq('=', comm($), $.stmt))
         ),
 
         // distinct = 'distinct' optInd typeDesc
-        distinct: $ => seq('distinct', $.optInd, $.typeDesc),
+        distinct: $ => seq('distinct', optInd($), $.typeDesc),
         // forStmt = 'for' (identWithPragma ^+ comma) 'in' expr colcom stmt
         forStmt: $ => seq(
             'for',
             sepList1($.identWithPragma, $.comma),
-            'in',
+            prec(2, 'in'),
             $.expr,
             $.colcom,
             $.stmt
@@ -507,7 +519,7 @@ module.exports = grammar({
         //         | forExpr
         //         | tryExpr)
         //     / simpleExpr
-        expr: $ => choice(
+        expr: $ => prec(2, choice(
             choice(
               $.blockExpr,
               $.ifExpr,
@@ -517,11 +529,11 @@ module.exports = grammar({
               $.tryExpr
             ),
             $.simpleExpr
-        ),
+        )),
 
         // typeKeyw = 'var' | 'out' | 'ref' | 'ptr' | 'shared' | 'tuple'
         //     | 'proc' | 'iterator' | 'distinct' | 'object' | 'enum'
-        typeKeyw: $ => choice(
+        typeKeyw: $ => prec(2, choice(
             'var',
             'out',
             'ref',
@@ -533,13 +545,13 @@ module.exports = grammar({
             'distinct',
             'object',
             'enum'
-        ),
+        )),
 
         // primary = typeKeyw optInd typeDesc
         //     /  prefixOperator* identOrLiteral primarySuffix*
 
         primary: $ => seq(
-            seq($.typeKeyw, $.optInd, $.typeDesc),
+            seq($.typeKeyw, optInd($), $.typeDesc),
             seq(repeat($.prefixOperator), $.identOrLiteral, repeat($.primarySuffix)),
             seq('bind', $.primary)
         ),
@@ -561,7 +573,7 @@ module.exports = grammar({
         //                            | IND{=} 'except' exprList ':' stmt
         //                            | IND{=} 'else' ':' stmt )*
 
-        postExprBlocks: $ => seq(
+        postExprBlocks: $ => prec.left(seq(
             ':',
             optional($.stmt),
             repeat(
@@ -573,7 +585,7 @@ module.exports = grammar({
                     seq($.IND_EQ, 'else', ':', $.stmt),
                 )
             )
-        ),
+        )),
 
 
         // exprStmt = simpleExpr
@@ -586,7 +598,7 @@ module.exports = grammar({
             $.simpleExpr,
             optional(
                 choice(
-                    seq('=', $.optInd, $.expr, optional($.colonBody)),
+                    seq('=', optInd($), $.expr, optional($.colonBody)),
                     seq(sepList1($.expr, $.comma), $.postExprBlocks)
                 )
             )
@@ -598,11 +610,11 @@ module.exports = grammar({
 
         importStmt: $ => seq(
             'import',
-            $.optInd,
+            optInd($),
             $.expr,
             choice(
                 repeat(seq($.comma, $.expr)),
-                seq('except', $.optInd, sepList1($.expr, $.comma))
+                seq('except', optInd($), sepList1($.expr, $.comma))
             )
         ),
 
@@ -612,54 +624,54 @@ module.exports = grammar({
 
         exportStmt: $ => seq(
             'export',
-            $.optInd,
+            optInd($),
             $.expr,
             choice(
                 repeat(seq($.comma, $.expr)),
-                seq('except', $.optInd, sepList1($.expr, $.comma))
+                seq('except', optInd($), sepList1($.expr, $.comma))
             )
         ),
 
         // includeStmt = 'include' optInd expr ^+ comma
-        includeStmt: $ => seq('include', $.optInd, sepList1($.expr, $.comma)),
+        includeStmt: $ => seq('include', optInd($), sepList1($.expr, $.comma)),
 
         // fromStmt = 'from' expr 'import' optInd expr (comma expr)*
         fromStmt: $ => seq(
             'from',
             $.expr,
             'import',
-            $.optInd,
+            optInd($),
             $.expr,
             repeat(seq($.comma, $.expr))
         ),
 
         // returnStmt = 'return' optInd expr?
-        returnStmt: $ => seq('return', $.optInd, optional($.expr)),
+        returnStmt: $ => seq('return', optInd($), optional($.expr)),
 
         // raiseStmt = 'raise' optInd expr?
-        raiseStmt: $ => seq('raise', $.optInd, optional($.expr)),
+        raiseStmt: $ => seq('raise', optInd($), optional($.expr)),
 
         // yieldStmt = 'yield' optInd expr?
-        yieldStmt: $ => seq('yield', $.optInd, optional($.expr)),
+        yieldStmt: $ => seq('yield', optInd($), optional($.expr)),
 
         // discardStmt = 'discard' optInd expr?
-        discardStmt: $ => seq('discard', $.optInd, optional($.expr)),
+        discardStmt: $ => seq('discard', optInd($), optional($.expr)),
 
         // breakStmt = 'break' optInd expr?
-        breakStmt: $ => seq('break', $.optInd, optional($.expr)),
+        breakStmt: $ => seq('break', optInd($), optional($.expr)),
 
         // continueStmt = 'break' optInd expr?
-        continueStmt: $ => seq('break', $.optInd, optional($.expr)),
+        continueStmt: $ => seq('continue', optInd($), optional($.expr)),
 
         // condStmt = expr colcom stmt COMMENT?
         //            (IND{=} 'elif' expr colcom stmt)*
         //            (IND{=} 'else' colcom stmt)?
 
-        condStmt: $ => seq(
+        condStmt: $ => prec.left(seq(
             seq($.expr, $.colcom, $.stmt, comm($)),
             repeat(seq($.IND_EQ, 'elif', $.expr, $.colcom, $.stmt)),
             optional(seq($.IND_EQ, 'else', $.colcom, $.stmt))
-        ),
+        )),
 
         // ifStmt = 'if' condStmt
         ifStmt: $ => seq('if', $.condStmt),
@@ -671,8 +683,8 @@ module.exports = grammar({
         //         ('elif' expr colcom expr optInd)*
         //          'else' colcom expr
         condExpr: $ => seq(
-            seq($.expr, $.colcom, $.expr, $.optInd),
-            repeat(seq('elif', $.expr, $.colcom, $.expr, $.optInd)),
+            seq($.expr, $.colcom, $.expr, optInd($)),
+            repeat(seq('elif', $.expr, $.colcom, $.expr, optInd($))),
             seq('else', $.colcom, $.expr)
         ),
 
@@ -695,12 +707,12 @@ module.exports = grammar({
         // ofBranches = ofBranch (IND{=} ofBranch)*
         //                       (IND{=} 'elif' expr colcom stmt)*
         //                       (IND{=} 'else' colcom stmt)?
-        ofBranches: $ => seq(
+        ofBranches: $ => prec.left(seq(
             $.ofBranch,
             repeat(seq($.IND_EQ, $.ofBranch)),
             repeat(seq($.IND_EQ, 'elif', $.expr, $.colcom, $.stmt)),
             optional(seq($.IND_EQ, 'else', $.colcom, $.stmt))
-        ),
+        )),
 
         // caseStmt = 'case' expr ':'? COMMENT?
         //             (IND{>} ofBranches DED
@@ -713,21 +725,21 @@ module.exports = grammar({
         //            (IND{=}? 'except' exprList colcom stmt)*
         //            (IND{=}? 'finally' colcom stmt)?
 
-        tryStmt: $ => seq(
+        tryStmt: $ => prec.left(seq(
             'try', $.colcom, $.stmt,
             seq(optional($.IND_EQ), 'except', 'finally'),
             repeat(seq(optional($.IND_EQ), 'except',  $.exprList, $.colcom, $.stmt)),
             optional(seq(optional($.IND_EQ), 'finally', $.colcom, $.stmt))
-        ),
+        )),
 
         // tryExpr = 'try' colcom stmt &(optInd 'except'|'finally')
         //            (optInd 'except' exprList colcom stmt)*
         //            (optInd 'finally' colcom stmt)?
-        tryExpr: $ => seq(
-            'try', $.colcom, $.stmt, seq($.optInd, choice('except', 'finally')),
-            repeat(seq($.optInd, 'except', $.exprList, $.colcom, $.stmt)),
-            optional(seq($.optInd, 'finally', $.colcom, $.stmt))
-        ),
+        tryExpr: $ => prec.left(seq(
+            'try', $.colcom, $.stmt, seq(optInd($), choice('except', 'finally')),
+            repeat(seq(optInd($), 'except', $.exprList, $.colcom, $.stmt)),
+            optional(seq(optInd($), 'finally', $.colcom, $.stmt))
+        )),
 
         // exceptBlock = 'except' colcom stmt
         exceptBlock: $ => seq('except', $.colcom, $.stmt),
@@ -752,56 +764,53 @@ module.exports = grammar({
         ),
 
         // genericParam = symbol (comma symbol)* (colon expr)? ('=' optInd expr)?
-        genericParam: $ => seq(
+        genericParam: $ => prec.left(seq(
             $.symbol,
             repeat(seq($.comma, $.symbol)),
             optional(seq($.colon, $.expr)),
-            optional(seq('=', $.optInd, $.expr))
-        ),
+            optional(seq('=', optInd($), $.expr))
+        )),
 
         // genericParamList = '[' optInd
         //   genericParam ^* (comma/semicolon) optPar ']'
         genericParamList: $ => seq(
             '[',
-            $.optInd,
+            optInd($),
             sepList($.genericParam, choice($.comma, $.semicolon)),
-            $.optPar,
+            optPar($),
             ']'
         ),
 
         // pattern = '{' stmt '}'
         pattern: $ => seq('{', $.stmt, '}'),
 
-        // indAndComment = (IND{>} COMMENT)? | COMMENT?
-        indAndComment: $ => choice(optional(
-            seq($.IND_GE, $.COMMENT)), comm($)),
 
         // routine = optInd identVis pattern? genericParamList?
         //   paramListColon pragma? ('=' COMMENT? stmt)? indAndComment
 
-        routine: $ => seq(
-            $.optInd,
+        routine: $ => prec.left(seq(
+            optInd($),
             $.identVis,
             optional($.pattern),
             optional($.genericParamList),
-            $.paramListColon,
+            paramListColon($),
             optional($.pragma),
             optional(seq('=', comm($), $.stmt)),
-            $.indAndComment
-        ),
+            indAndComment($)
+        )),
 
         // commentStmt = COMMENT
-        commentStmt: $ => $.COMMENT,
+        commentStmt: $ => prec(2, $.COMMENT),
 
         // enum = 'enum' optInd (symbol pragma? optInd ('=' optInd expr COMMENT?)? comma?)+
         enum: $ => seq(
             'enum',
-            $.optInd,
+            optInd($),
             repeat1(seq(
                 $.symbol,
                 optional($.pragma),
-                $.optInd,
-                optional(seq('=', $.optInd, $.expr, comm($))),
+                optInd($),
+                optional(seq('=', optInd($), $.expr, comm($))),
                 optional($.comma)
             ))
         ),
@@ -880,30 +889,30 @@ module.exports = grammar({
         //             indAndComment?
 
         // WARNING FIXME ERROR NOTE FUCKING_SHIT
-        typeDef: $ => seq(
+        typeDef: $ => prec.left(seq(
             $.identWithPragmaDot,
             optional($.genericParamList),
             '=',
-            $.optInd,
+            optInd($),
             $.typeDefAux,
-            choice(optional($.indAndComment), $.identVisDot),
+            choice(optional(indAndComment($)), $.identVisDot),
             optional($.genericParamList),
             $.pragma,
             '=',
-            $.optInd,
+            optInd($),
             $.typeDefAux,
-            optional($.indAndComment)
-        ),
+            optional(indAndComment($))
+        )),
 
         // varTuple = '(' optInd identWithPragma ^+ comma optPar ')' '=' optInd expr
         varTuple: $ => seq(
             '(',
-            $.optInd,
+            optInd($),
             sepList1($.identWithPragma, $.comma),
-            $.optPar,
+            optPar($),
             ')',
             '=',
-            $.optInd,
+            optInd($),
             $.expr
         ),
 
@@ -911,27 +920,27 @@ module.exports = grammar({
         colonBody: $ => seq($.colcom, $.stmt, optional($.postExprBlocks)),
 
         // variable = (varTuple / identColonEquals) colonBody? indAndComment
-        variable: $ => seq(
+        variable: $ => prec.left(seq(
             choice($.varTuple, $.identColonEquals),
             optional($.colonBody),
-            $.indAndComment
-        ),
+            indAndComment($)
+        )),
 
         // constant = (varTuple / identWithPragma) (colon typeDesc)? '=' optInd expr indAndComment
-        constant: $ => seq(
+        constant: $ => prec.left(seq(
             choice($.varTuple, $.identWithPragma),
             optional(seq($.colon, $.typeDesc)),
             '=',
-            $.optInd,
+            optInd($),
             $.expr,
-            $.indAndComment
-        ),
+            indAndComment($)
+        )),
 
         // bindStmt = 'bind' optInd qualifiedIdent ^+ comma
-        bindStmt: $ => seq('bind', $.optInd, sepList1($.qualifiedIdent, $.comma)),
+        bindStmt: $ => seq('bind', optInd($), sepList1($.qualifiedIdent, $.comma)),
 
         // mixinStmt = 'mixin' optInd qualifiedIdent ^+ comma
-        mixinStmt: $ => seq('mixin', $.optInd, sepList1($.qualifiedIdent, $.comma)),
+        mixinStmt: $ => seq('mixin', optInd($), sepList1($.qualifiedIdent, $.comma)),
 
         // pragmaStmt = pragma (':' COMMENT? stmt)?
         pragmaStmt: $ => seq($.pragma, optional(seq(':', comm($), $.stmt))),
@@ -1005,10 +1014,17 @@ module.exports = grammar({
         // stmt = (IND{>} complexOrSimpleStmt^+(IND{=} / ';') DED)
         //      / simpleStmt ^+ ';'
         stmt: $ => choice(
-            seq(
-                $.IND_GE,
-                sepList1($.complexOrSimpleStmt, choice($.IND_EQ, ';')), $.DED),
-            sepList1($.simpleStmt, ';')
+            prec.left(
+                2,
+                seq(
+                    $.IND_GE,
+                    sepList1(
+                        $.complexOrSimpleStmt,
+                        choice($.IND_EQ, ';')),
+                    $.DED
+                )
+            ),
+            prec.left(1, sepList1($.simpleStmt, ';'))
         ),
 
 
