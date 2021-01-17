@@ -65,6 +65,8 @@ module.exports = grammar({
         /[\s\f]/
     ],
 
+    word: $ => $.IDENT,
+
     rules: {
         // WARNING
         // module = stmt ^* (';' / IND{=})
@@ -162,70 +164,25 @@ module.exports = grammar({
 
         IND: $ => choice($.IND_EQ, $.IND_GE, $.DED),
 
-        // prefixOperator = operator
         prefixOperator: $ => $.operator,
-
-        // // optInd = COMMENT? IND?
-        // optInd: $ => seq(comm($), oind($)),
-
-        // // optPar = (IND{>} | IND{=})?
-        // optPar: $ => optional(choice($.IND_GE, $.IND_EQ)),
-
-        // simpleExpr = arrowExpr (OP0 optInd arrowExpr)* pragma?
-        simpleExpr: $ => prec.left(seq(
-            $.arrowExpr,
-            repeat(seq($.OP0, optInd($), $.arrowExpr)),
-            optional($.pragma)
-        )),
-
-        // arrowExpr = assignExpr (OP1 optInd assignExpr)*
-        arrowExpr: $ => prec.left(seq(
-            $.assignExpr,
-            repeat(seq($.OP1, optInd($), $.assignExpr)))),
-
-        // assignExpr = orExpr (OP2 optInd orExpr)*
-        assignExpr: $ => prec.left(seq(
-            $.orExpr,
-            repeat(seq($.OP2, optInd($), $.orExpr)))),
-
-        // orExpr = andExpr (OP3 optInd andExpr)*
-        orExpr: $ => prec.left(seq(
-            $.andExpr,
-            repeat(seq($.OP3, optInd($), $.andExpr)))),
-
-        // andExpr = cmpExpr (OP4 optInd cmpExpr)*
-        andExpr: $ => prec.left(seq(
-            $.cmpExpr,
-            repeat(seq($.OP4, optInd($), $.cmpExpr)))),
-
-        // cmpExpr = sliceExpr (OP5 optInd sliceExpr)*
-        cmpExpr: $ => prec.left(seq(
-            $.sliceExpr,
-            repeat(seq($.OP5, optInd($), $.sliceExpr)))),
-
-        // sliceExpr = ampExpr (OP6 optInd ampExpr)*
-        sliceExpr: $ => prec.left(seq(
-            $.ampExpr,
-            repeat(seq($.OP6, optInd($), $.ampExpr)))),
+        simpleExpr: $ => choice(
+            $.IDENT,
+            $.binaryExpr
+        ),
 
 
-        // ampExpr = plusExpr (OP7 optInd plusExpr)*
-        ampExpr: $ => prec.left(seq(
-            $.plusExpr,
-            repeat(seq($.OP7, optInd($), $.plusExpr)))),
-
-        // plusExpr = mulExpr (OP8 optInd mulExpr)*
-        plusExpr: $ => prec.left(seq(
-            $.mulExpr,
-            repeat(seq($.OP8, optInd($), $.mulExpr)))),
-
-        // mulExpr = dollarExpr (OP9 optInd dollarExpr)*
-        mulExpr: $ => prec.left(seq(
-            $.dollarExpr,
-            repeat(seq($.OP9, optInd($), $.dollarExpr)))),
-
-        // dollarExpr = primary (OP10 optInd primary)*
-        dollarExpr: $ => seq($.primary, repeat(seq($.OP10, optInd($), $.primary))),
+        binaryExpr: $ => choice(
+            prec.left(9, seq($.binaryExpr, $.OP9, $.binaryExpr)),
+            prec.left(8, seq($.binaryExpr, $.OP8, $.binaryExpr)),
+            prec.left(7, seq($.binaryExpr, $.OP7, $.binaryExpr)),
+            prec.left(6, seq($.binaryExpr, $.OP6, $.binaryExpr)),
+            prec.left(5, seq($.binaryExpr, $.OP5, $.binaryExpr)),
+            prec.left(4, seq($.binaryExpr, $.OP4, $.binaryExpr)),
+            prec.left(3, seq($.binaryExpr, $.OP3, $.binaryExpr)),
+            prec.left(2, seq($.binaryExpr, $.OP2, $.binaryExpr)),
+            prec.left(1, seq($.binaryExpr, $.OP1, $.binaryExpr)),
+            prec.left(0, seq($.binaryExpr, $.OP0, $.binaryExpr)),
+        ),
 
         // symbol = '`' (KEYW|IDENT|literal|(operator|'('|')'|'['|']'|'{'|'}'|'=')+)+ '`'
         // | IDENT | KEYW
@@ -290,20 +247,8 @@ module.exports = grammar({
         // | 'finally' | 'except' | 'for' | 'block' | 'const' | 'let'
         // | 'when' | 'var' | 'mixin'
         parKeyw: $ => seq(
-            'discard',
-            'include',
-            'if',
-            'while',
-            'case',
-            'try',
-            'finally',
-            'except',
-            'for',
-            'block',
-            'const',
-            'let',
-            'when',
-            'var',
+            'discard', 'include', 'if', 'while', 'case', 'try', 'finally',
+            'except', 'for', 'block', 'const', 'let', 'when', 'var',
             'mixin'
         ),
 
@@ -1016,14 +961,14 @@ module.exports = grammar({
         // stmt = (IND{>} complexOrSimpleStmt^+(IND{=} / ';') DED)
         //      / simpleStmt ^+ ';'
         stmt: $ => choice(
-            seq(
+            prec(2, seq(
                 $.IND_GE,
                 sepList1(
                     $.complexOrSimpleStmt,
                     choice($.IND_EQ, ';')),
                 $.DED
-            ),
-            prec.left(sepList1($.simpleStmt, ';'))
+            )),
+            prec(1, sepList1($.simpleStmt, ';'))
         ),
 
 
