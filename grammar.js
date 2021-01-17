@@ -6,12 +6,13 @@ function sepList1(rule, separator) {
     return seq(rule, repeat1(seq(separator, rule)));
 }
 
-function comm($) {
-    return optional($.COMMENT);
-}
+// function comm($) {
+//     return optional($.COMMENT);
+// }
 
 function optInd($) {
-    return seq($.COMMENT, optional($.IND));
+    // return seq($.COMMENT, optional($.IND));
+    return optional($.IND);
 }
 
 function optPar($) {
@@ -35,20 +36,12 @@ function paramListArrow($) {
 
 // indAndComment = (IND{>} COMMENT)? | COMMENT?
 function indAndComment($) {
-    return choice(optional(seq($.IND_GE, $.COMMENT)), comm($));
+    return choice(optional(seq($.IND_GE, $.COMMENT)), $.COMMENT);
 }
 
 function section($, rule) {
-    return seq(
-        comm($),
-        choice(
-            rule,
-            seq(
-                $.IND_GE,
-                sepList1(choice(rule, $.COMMENT), $.IND_EQ),
-                $.DED
-            )
-        )
+    return choice(
+        rule, seq($.IND_GE, sepList1(rule, $.IND_EQ), $.DED)
     );
 }
 
@@ -78,16 +71,16 @@ module.exports = grammar({
         module: $ => sepList($.stmt, choice(';', $.IND_EQ)),
 
         // comma = ',' COMMENT?
-        comma: $ => prec.left(seq(',', comm($))),
+        comma: $ => ',',
 
         // semicolon = ';' COMMENT?
-        semicolon: $ => seq(';', comm($)),
+        semicolon: $ => ';',
 
         // colon = ':' COMMENT?
-        colon: $ => seq(':', comm($)),
+        colon: $ => ':',
 
         // colcom = ':' COMMENT?
-        colcom: $ => prec.left(1, seq(':', comm($))),
+        colcom: $ => ':',
 
         KEYW: $ => prec(2, choice(
             'addr', 'and', 'as', 'asm', 'bind', 'block', 'break', 'case',
@@ -472,7 +465,6 @@ module.exports = grammar({
         //   COMMENT? (IND{>} identColonEquals (IND{=} identColonEquals)*)?
         extTupleDecl: $ => seq(
             'tuple',
-            comm($),
             seq(
                 $.IND_GE,
                 $.identColonEquals,
@@ -498,7 +490,7 @@ module.exports = grammar({
             'proc',
             paramListColon($),
             optional($.pragma),
-            optional(seq('=', comm($), $.stmt))
+            optional(seq('=', $.stmt))
         ),
 
         // distinct = 'distinct' optInd typeDesc
@@ -679,7 +671,7 @@ module.exports = grammar({
         //            (IND{=} 'else' colcom stmt)?
 
         condStmt: $ => prec.left(seq(
-            seq($.expr, $.colcom, $.stmt, comm($)),
+            seq($.expr, $.colcom, $.stmt),
             repeat(seq($.IND_EQ, 'elif', $.expr, $.colcom, $.stmt)),
             optional(seq($.IND_EQ, 'else', $.colcom, $.stmt))
         )),
@@ -729,7 +721,7 @@ module.exports = grammar({
         //             (IND{>} ofBranches DED
         //             | IND{=} ofBranches)
         caseStmt: $ => seq(
-            seq('case', $.expr, optional(':'), comm($)),
+            seq('case', $.expr, optional(':')),
             seq($.IND_GE, $.ofBranches, $.DED, $.IND_EQ, $.ofBranches)),
 
         // tryStmt = 'try' colcom stmt &(IND{=}? 'except'|'finally')
@@ -806,7 +798,7 @@ module.exports = grammar({
             optional($.genericParamList),
             paramListColon($),
             optional($.pragma),
-            optional(seq('=', comm($), $.stmt)),
+            optional(seq('=', $.stmt)),
             indAndComment($)
         )),
 
@@ -821,7 +813,7 @@ module.exports = grammar({
                 $.symbol,
                 optional($.pragma),
                 optInd($),
-                optional(seq('=', optInd($), $.expr, comm($))),
+                optional(seq('=', optInd($), $.expr)),
                 optional($.comma)
             ))
         ),
@@ -831,9 +823,9 @@ module.exports = grammar({
         //             ('else' colcom objectPart COMMENT?)?
         objectWhen: $ => seq(
             'when',
-            seq($.expr, $.colcom, $.objectPart, comm($)),
-            repeat(seq('elif', $.expr, $.colcom, $.objectPart, comm($))),
-            optional(seq('else', $.colcom, $.objectPart, comm($)))
+            seq($.expr, $.colcom, $.objectPart),
+            repeat(seq('elif', $.expr, $.colcom, $.objectPart)),
+            optional(seq('else', $.colcom, $.objectPart))
         ),
 
         // objectBranch = 'of' exprList colcom objectPart
@@ -854,7 +846,7 @@ module.exports = grammar({
         //             (IND{>} objectBranches DED
         //             | IND{=} objectBranches)
         objectCase: $ => seq(
-            'case', $.identWithPragma, ':', $.typeDesc, optional(':'), comm($),
+            'case', $.identWithPragma, ':', $.typeDesc, optional(':'),
             choice(
                 seq($.IND_GE, $.objectBranches, $.DED),
                 seq($.IND_EQ, $.objectBranches)
@@ -878,7 +870,6 @@ module.exports = grammar({
             'object',
             optional($.pragma),
             optional(seq('of', $.typeDesc)),
-            comm($),
             $.objectPart
         ),
 
@@ -956,7 +947,7 @@ module.exports = grammar({
 
         // pragmaStmt = pragma (':' COMMENT? stmt)?
         pragmaStmt: $ => prec.left(
-            seq($.pragma, optional(seq(':', comm($), $.stmt)))),
+            seq($.pragma, optional(seq(':', $.stmt)))),
 
         // simpleStmt = ((returnStmt | raiseStmt | yieldStmt | discardStmt | breakStmt
         //            | continueStmt | pragmaStmt | importStmt | exportStmt | fromStmt
@@ -979,7 +970,6 @@ module.exports = grammar({
                 ),
                 $.exprStmt
             ),
-            comm($)
         )),
 
         // complexOrSimpleStmt = (ifStmt | whenStmt | whileStmt
@@ -1027,17 +1017,14 @@ module.exports = grammar({
         // stmt = (IND{>} complexOrSimpleStmt^+(IND{=} / ';') DED)
         //      / simpleStmt ^+ ';'
         stmt: $ => choice(
-            prec.left(
-                2,
-                seq(
-                    $.IND_GE,
-                    sepList1(
-                        $.complexOrSimpleStmt,
-                        choice($.IND_EQ, ';')),
-                    $.DED
-                )
+            seq(
+                $.IND_GE,
+                sepList1(
+                    $.complexOrSimpleStmt,
+                    choice($.IND_EQ, ';')),
+                $.DED
             ),
-            prec.left(1, sepList1($.simpleStmt, ';'))
+            prec.left(sepList1($.simpleStmt, ';'))
         ),
 
 
